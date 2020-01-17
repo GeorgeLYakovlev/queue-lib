@@ -58,6 +58,8 @@ func (kqmc *KafkaQueueManagerCreator) CreateQueueManager(server, user, pass stri
 		kc = context.(*KafkaContext)
 	}
 
+	kqm.Dialer = &kafka.Dialer{}
+
 	if kc != nil {
 		kqm.Dialer.Timeout = kc.Timeout
 		kqm.Dialer.TLS = kc.TLS
@@ -156,7 +158,7 @@ func (kqm * KafkaQueueManager) CreateReceivingChannel(topic string, ctx interfac
 		for !quit {
 			var m kafka.Message
 			var err error
-			if kqc.AutoConfirm {
+			if kqc != nil && kqc.AutoConfirm {
 				m, err = r.ReadMessage(ctx)
 			} else {
 				m, err = r.FetchMessage(ctx)
