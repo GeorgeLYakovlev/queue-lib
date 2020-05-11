@@ -13,7 +13,7 @@ type QueueManagerConnector interface {
 	/**
          * Connects to server with provided credentials and creates a queue manager.
          */
-	CreateQueueManager(server, user, pass string, context interface{}) (QueueManager, error)
+	CreateQueueManager(server []string, user, pass string, context interface{}) (QueueManager, error)
 }
 
 type OutgoingChannelType int
@@ -33,6 +33,8 @@ type QueueMessage struct {
 }
 
 type QueueManager interface {
+	SetClientId(id string)
+	GetClientId() string
 	CreateTopic(topic string, config interface{}) error
 	DeleteTopic(topic string) error
 	CreateOutgoingChannel(topic string, channel_type OutgoingChannelType, config interface{}) (OutgoingChannel, error)

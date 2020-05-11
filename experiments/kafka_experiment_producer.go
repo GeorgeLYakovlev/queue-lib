@@ -35,7 +35,7 @@ func main() {
 		Timeout: 10 * time.Second,
 		TLS: nil,
 	}
-	queue, err := kafka.Kafka.CreateQueueManager(args.Server, args.User, args.Password, &kafka_context)
+	queue, err := kafka.Kafka.CreateQueueManager([]string{args.Server}, args.User, args.Password, &kafka_context)
 	if err != nil {
 		log.Fatalf("Failed to connect to Kafka:%s\n", err)
 	}

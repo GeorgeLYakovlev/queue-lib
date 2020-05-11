@@ -21,7 +21,8 @@ type KafkaContext struct {
 }
 
 type KafkaQueueManager struct {
-	Server  string
+	Servers []string
+	Id      string
 	Dialer  *kafka.Dialer
 	Conn    *kafka.Conn
 	quit    chan bool
@@ -51,7 +52,7 @@ type KafkaTransportData struct {
 const DefaultTimeout = 30 * time.Second
 const DefaultKey = "jsonMessage"
 
-func (kqmc *KafkaQueueManagerCreator) CreateQueueManager(server, user, pass string, context interface{}) (queuelib.QueueManager, error) {
+func (kqmc *KafkaQueueManagerCreator) CreateQueueManager(servers []string, user, pass string, context interface{}) (queuelib.QueueManager, error) {
 	var kqm KafkaQueueManager
 	var kc *KafkaContext
 	if context != nil {
@@ -68,13 +69,21 @@ func (kqmc *KafkaQueueManagerCreator) CreateQueueManager(server, user, pass stri
 		kqm.Dialer.Timeout = DefaultTimeout
 	}
 	kqm.Dialer.DualStack = true
-	kqm.Server = server
+	kqm.Servers = servers
 	kqm.quit = make(chan bool, 1)
 	err := kqm.CreateConnection()
 	return &kqm, err
 }
 
 var Kafka KafkaQueueManagerCreator
+
+func (kqm *KafkaQueueManager) SetClientId(id string) {
+	kqm.Id = id
+}
+
+func (kqm *KafkaQueueManager) GetClientId() string {
+	return kqm.Id
+}
 
 func (kqm *KafkaQueueManager) CreateTopic(topic string, config interface{}) error {
 	if config == nil {
@@ -93,7 +102,7 @@ func (kqm *KafkaQueueManager) DeleteTopic(topic string) error {
 
 func (kqm *KafkaQueueManager) CreateOutgoingChannel(topic string, channel_type queuelib.OutgoingChannelType, config interface{}) (queuelib.OutgoingChannel, error) {
 	w := kafka.NewWriter(kafka.WriterConfig{
-		Brokers:  []string{kqm.Server},
+		Brokers:  kqm.Servers,
 		Topic:    topic,
 		Balancer: &kafka.Hash{},
 		Dialer:   kqm.Dialer,
@@ -113,12 +122,12 @@ func (kqm * KafkaQueueManager) CreateConnection() error {
 	var conn *kafka.Conn
 	var err error
 	if kqm.Context != nil {
-		conn, err = kqm.Dialer.DialContext(kqm.Context, "tcp", kqm.Server)
+		conn, err = kqm.Dialer.DialContext(kqm.Context, "tcp", kqm.Servers[0])
 	} else {
-		conn, err = kqm.Dialer.Dial("tcp", kqm.Server)
+		conn, err = kqm.Dialer.Dial("tcp", kqm.Servers[0])
 	}
 	if err != nil {
-		log.Printf("Failed to dial %s:%s\n", kqm.Server, err)
+		log.Printf("Failed to dial %s:%s\n", kqm.Servers[0], err)
 	}
 	kqm.Conn = conn
 	return err
@@ -134,7 +143,7 @@ func (kqm * KafkaQueueManager) CreateReceivingChannel(topic string, ctx interfac
 		group_id = kqc.GroupID
 	}
 	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{kqm.Server},
+		Brokers: kqm.Servers,
 		GroupID: group_id,
 		Topic:   topic,
 		Dialer:  kqm.Dialer,
