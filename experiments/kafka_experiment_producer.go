@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	//	"math/rand"
@@ -21,6 +22,13 @@ var args struct {
 	Partitions int    `short:"p" long:"partitions" description:"number of partitions" default:"1"`
 	Messages   int    `short:"m" long:"messages" description:"number of messages to generate. If ommitted will receive."`
 	Create     bool   `short:"c" long:"create" description:"Create topic, destroy when finished"`
+	Destroy    bool   `short:"d" long:"destroy" description:"Destroy topic when finished"`
+	UseJson    bool   `short:"j" long:"use_json" description:"Use json for messages"`
+}
+
+type StructuredData struct {
+	MessageNum  int64 `json:"message_number,omitempty"`
+	MessageText string `json:"message_text,omitempty"`
 }
 
 var parser = flags.NewParser(&args, flags.Default)
@@ -49,11 +57,15 @@ func main() {
 			err = queue.CreateTopic(args.TopicName, &topic_config)
 			if err != nil {
 				log.Printf("Failed to create partition: %s\n", err)
-			} else {
-				defer queue.DeleteTopic(args.TopicName)
 			}
 		}
-		channel, err := queue.CreateOutgoingChannel(args.TopicName, queuelib.ChannelQueue, nil)
+		if args.Destroy {
+			defer queue.DeleteTopic(args.TopicName)
+		}
+		queue_config := kafka.KafkaQueueConfig{
+			GroupID: args.TopicName,
+		}
+		channel, err := queue.CreateOutgoingChannel(args.TopicName, queuelib.ChannelQueue, &queue_config)
 		if err != nil {
 			log.Fatalf("Failed to get topic:%s\n", err)
 		}
@@ -62,6 +74,14 @@ func main() {
 			message := queuelib.QueueMessage{
 				Topic: args.TopicName,
 				StringData: fmt.Sprintf("Message #%d", i),
+			}
+			if args.UseJson {
+				data := StructuredData{
+					MessageNum: int64(i),
+					MessageText: message.StringData,
+				}
+				message.JsonData, _ = json.Marshal(&data)
+				message.StringData = fmt.Sprintf("jsonMessage%08d", i)
 			}
 			err = channel.Send(message)
 			if err != nil {

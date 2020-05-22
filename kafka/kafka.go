@@ -107,6 +107,7 @@ func (kqm *KafkaQueueManager) CreateOutgoingChannel(topic string, channel_type q
 		Balancer: &kafka.Hash{},
 		Dialer:   kqm.Dialer,
 	})
+	// log.Printf("Kafka NewWriter:\n Brokers:%+v\n Topic:%s\n Dialer:%+v\n", kqm.Servers, topic, kqm.Dialer)
 	var kqc *KafkaQueueConfig
 	if config != nil {
 		kqc = config.(*KafkaQueueConfig)
@@ -155,6 +156,7 @@ func (kqm * KafkaQueueManager) CreateReceivingChannel(topic string, ctx interfac
 	kqm.wg.Add(1)
 	message_channel := make(chan *queuelib.QueueMessage, 32)
 	go func(r *kafka.Reader, message_channel chan *queuelib.QueueMessage) {
+		// log.Printf(">>>>>>>>>Start reading: %v\n", r)
 		ctx, cancel_func := context.WithCancel(context.Background())
 		quit := false
 		go func(quit *bool) {
@@ -169,11 +171,13 @@ func (kqm * KafkaQueueManager) CreateReceivingChannel(topic string, ctx interfac
 			var err error
 			if kqc != nil && kqc.AutoConfirm {
 				m, err = r.ReadMessage(ctx)
+				// log.Printf(">>>>>>>>>Read message: %+v\n", m)
 			} else {
 				m, err = r.FetchMessage(ctx)
+				// log.Printf(">>>>>>>>>Fetched message: %+v\n", m)
 			}
 			if err != nil {
-				log.Printf("Failed to receive message:%s\n", err)
+				// log.Printf(">>>>>>>>>Failed to receive message:%s\n", err)
 				break
 			}
 			qm := queuelib.QueueMessage{
@@ -214,6 +218,7 @@ func (koc *KafkaOutgoingChannel) Send(queue_message queuelib.QueueMessage) error
 	if len(queue_message.StringData) > 0 {
 		key = queue_message.StringData
 	}
+	// log.Printf("Kafka writer: %+v\nMessage: %+v\n", koc.Writer, queue_message)
 	return koc.Writer.WriteMessages(context.Background(), kafka.Message{
 		Key: []byte(key),
 		Value: queue_message.JsonData,
